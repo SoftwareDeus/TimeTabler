@@ -74,20 +74,23 @@ export function createTimeTabler(name: string): string{
 	return timeTabler.id;
 }
 
-export function createTableProp(timeTablerId: string) {
+export function createTableProp(timeTablerId: string): string {
 	const timeTabler = get(timeTablerStore).find(timeTabler => timeTabler.id === timeTablerId)
 	
 	if (!timeTabler)
-		return; 
+		return ""; 
 
 	const tableProp = get(tablePropsStore).filter(prop => timeTabler.TablePropIds.find(propId => propId === prop.id)).sort((a, b) => a.index - b.index).pop();
 	
 	const tablePropId = initNewTableProp(timeTabler.TablePropIds.length + 1, tableProp);
+	
 	if(!timeTabler)
-		return;
+		return "";
 
 	timeTabler?.TablePropIds.push(tablePropId);
 	updateTimeTabler(timeTabler);
+
+	return tablePropId;
 }
 
 export function updateTimeTabler(timeTabler: TimeTabler) {

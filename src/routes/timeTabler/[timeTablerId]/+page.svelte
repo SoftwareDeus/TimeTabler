@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { getTablePropsFromTimeTabler } from '../../../stores/tablePropsStore';
 	import {
-		getTablePropsFromTimeTabler,
-		timeTablerStore,
-		type TableProp
+		createTableProp,
+		tablePropsStore
 	} from '../../../stores/tablePropsStore';
 	/***
 	 * TODO:
@@ -11,10 +11,6 @@
 	 * []: Warum geht den der drecks reset nicht???? like wofür hab ich das denn xd eig sollte alles über tablepropid getaked werden können. Ongoood
 	 */
 
-	import {
-		createTableProp,
-		tablePropsStore
-	} from '../../../stores/tablePropsStore';
 	import { MonthsEnum } from '../../../types/enums';
 	let timeTablerId: string = $page.params.timeTablerId;
 
