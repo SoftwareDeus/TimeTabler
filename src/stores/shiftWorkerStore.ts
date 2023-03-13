@@ -13,24 +13,19 @@ export type ShiftWorker = {
 
 export type JobInfo = {
 	maxAvailableHours: number;
-	staffPriority: number;
+	isBoss: boolean;
 };
 
 export type WorkDay = {
 	id: string;
+	tablePropId: string;
 	hours: number;
 	day: {
-		index: number,
-		shift: Shift
-	}
+		index: number;
+		shift: Shift;
+	};
 };
 
-/***
- * TODO:
- * [] Allgemeines Workertodo die müssten immer auf zugewiesene ID auf tableProps arbeiten. z.B. für schichten undso. 
- * [] Klappt das überhaubt auf Workerseite? Müsste WorkDays halt auslagern und die über nen assignment table oder so rüberlaufen lassen? Digggeer :D
- * [] Brauchen noch die cheffe. Die könnten sich eig auch nur über nen booelean unterscheiden. Und dann mach ich rest in UI oder?
- */
 export const workerStore = createIndexedDBStore<ShiftWorker[]>({
 	key: 'Workers',
 	initialValue: []
@@ -54,14 +49,16 @@ export function updateWorker(worker: ShiftWorker) {
 			(_worker) => !(_worker.id === worker.id)
 		);
 		tempCurrents.push(worker);
-		tempCurrents = tempCurrents.sort((a, b) => a.createdAt.valueOf() - b.createdAt.valueOf())
+		tempCurrents = tempCurrents.sort(
+			(a, b) => a.createdAt.valueOf() - b.createdAt.valueOf()
+		);
 		return tempCurrents;
 	});
 }
 
-export function updateWorkerShift(worker: ShiftWorker, shift: WorkDay){
-	 updateWorker({
+export function updateWorkerShift(worker: ShiftWorker, shift: WorkDay) {
+	updateWorker({
 		...worker,
-		workDays: worker.workDays.filter(_shift => _shift.id !== shift.id)
-	 })
+		workDays: worker.workDays.filter((_shift) => _shift.id !== shift.id)
+	});
 }

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { stateStore } from './../stores/stateStore';
 	import {
 		getTablePropById,
 		setTableProps,
@@ -39,16 +40,27 @@
 		[key: string]: Feiertag;
 	};
 	export let tablePropId: string;
-
+	$: resetState(tablePropId);
 	$: tableProp = $tablePropsStore.find((_prop) => _prop.id === tablePropId)!;
 	$: editMode = false;
 	$: workers = $workerStore!;
-	$: earlyStart = getTimeStringFromDate(tableProp.shiftTimes.early.startTime);
-	$: earlyEnd = getTimeStringFromDate(tableProp.shiftTimes.early.endTime);
-	$: lateStart = getTimeStringFromDate(tableProp.shiftTimes.late.startTime);
-	$: lateEnd = getTimeStringFromDate(tableProp.shiftTimes.late.endTime);
-	$: days = tableProp.days;
-
+	$: earlyStart = tableProp
+		? getTimeStringFromDate(tableProp.shiftTimes.early.startTime)
+		: '08:00';
+	$: earlyEnd = tableProp
+		? getTimeStringFromDate(tableProp.shiftTimes.early.endTime)
+		: '16:30';
+	$: lateStart = tableProp
+		? getTimeStringFromDate(tableProp.shiftTimes.late.startTime)
+		: '16:30';
+	$: lateEnd = tableProp
+		? getTimeStringFromDate(tableProp.shiftTimes.late.endTime)
+		: '01:00';
+	$: days = tableProp?.days ?? [];
+	function resetState(trigger: string) {
+		$stateStore = $stateStore;
+	}
+	stateStore.subscribe((value) => (tableProp = tableProp));
 	tablePropsStore.subscribe((tableProps) => {
 		const _tableProp = tableProps.find((_prop) => {
 			_prop.id === tablePropId;
@@ -106,6 +118,7 @@
 				);
 				0.5; //0.5 pause
 				const tempWorkDay: WorkDay = {
+					tablePropId,
 					id: uuidv4(),
 					day: {
 						index: day.day,
@@ -152,6 +165,7 @@
 					0.5; //0.5 pause
 
 				const tempWorkDay: WorkDay = {
+					tablePropId,
 					id: uuidv4(),
 					day: {
 						index: day.day,
@@ -209,9 +223,9 @@
 <div class="componentContainer">
 	<div class="tableContainer">
 		<div class="headerMonthDisplay">
-			{MonthsEnum[new Date(tableProp.date).getMonth()]} - {new Date(
+			<!-- {MonthsEnum[new Date(tableProp.date).getMonth()]} - {new Date(
 				tableProp.date
-			).getFullYear()}
+			).getFullYear()} -->
 		</div>
 		<div class="Container">
 			<table>
@@ -317,10 +331,10 @@
 	</div>
 </div>
 <div class="InfoContainer">
-	<WorkersConfig {tablePropId} />
+	<WorkersConfig _tablePropId={tablePropId} />
 </div>
 <div>
-	<TableInfo {days} workers={$workerStore ?? []} />
+	<TableInfo {tablePropId} {days} workers={$workerStore ?? []} />
 </div>
 
 <style>
@@ -392,7 +406,7 @@
 	}
 	.tableContainer {
 		overflow-x: auto;
-		height: 800px;
+		height: 750px;
 	}
 	.componentContainer {
 		width: 100%;

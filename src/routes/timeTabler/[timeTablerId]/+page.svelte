@@ -1,6 +1,10 @@
 <script lang="ts">
+	import { stateStore } from './../../../stores/stateStore';
 	import { page } from '$app/stores';
-	import { getTablePropsFromTimeTabler } from '../../../stores/tablePropsStore';
+	import {
+		getTablePropsFromTimeTabler,
+		timeTablerStore
+	} from '../../../stores/tablePropsStore';
 	import {
 		createTableProp,
 		tablePropsStore
@@ -12,8 +16,13 @@
 	 */
 
 	import { MonthsEnum } from '../../../types/enums';
+	import { get } from 'svelte/store';
 	let timeTablerId: string = $page.params.timeTablerId;
+	$: setTimeTablerId(timeTablerId);
 
+	function setTimeTablerId(timeTablerId: string) {
+		$stateStore.timeTablerId = timeTablerId;
+	}
 	let tableProps = getTablePropsFromTimeTabler(timeTablerId);
 
 	tablePropsStore.subscribe((_props) => {
@@ -28,7 +37,10 @@
 
 {#if timeTablerId}
 	<div style="width: 100%">
-		<h2>Schichtpläne</h2>
+		<h2>
+			{get(timeTablerStore).find((timeTabler) => timeTabler.id === timeTablerId)
+				?.name} - Schichtpläne
+		</h2>
 	</div>
 
 	<div class="itemContainer">

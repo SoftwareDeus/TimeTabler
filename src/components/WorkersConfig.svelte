@@ -1,10 +1,5 @@
 <script lang="ts">
-	/***
-	 * TODO::
-	 * []: Nächster Table -> Entweder nächster vorhandener oder neuen erstellen
-	 * []: Zurück -> Letzter Table oder neuen erstellen
-	 * []: Beim erstellen vom table nachricht ausgeben
-	 ***/
+	import { stateStore } from './../stores/stateStore';
 	import WorkDayList from './WorkDayList.svelte';
 	import {
 		addWorker,
@@ -20,6 +15,9 @@
 		tablePropsStore
 	} from '../stores/tablePropsStore';
 	import { milisecToHours } from '../stores/helpers';
+
+	export let _tablePropId: string;
+	$: tablePropId = _tablePropId;
 	let newWorker: ShiftWorker = {
 		colorHex: '#000040',
 		createdAt: new Date(),
@@ -28,28 +26,38 @@
 		lastName: '',
 		jobInfo: {
 			maxAvailableHours: 0,
-			staffPriority: 0
+			isBoss: false
 		},
 		workDays: []
 	};
-
-	let newWorkDay: WorkDay = {
-		id: 'NOID',
-		hours: 8,
-		day: {
-			index: 1,
-			shift: {
-				startTime: new Date(new Date().setHours(8, 0)),
-				endTime: new Date(new Date().setHours(16, 30))
+	function getNewWorkDay(_tablePropId: string): WorkDay {
+		const tableProp = $tablePropsStore.find((prop) => prop.id === _tablePropId);
+		const tempDate = new Date(tableProp?.date ?? '');
+		return {
+			tablePropId,
+			id: 'NOID',
+			hours: 8,
+			day: {
+				index: 1,
+				shift: {
+					startTime: new Date(new Date(tempDate).setHours(8, 0)),
+					endTime: new Date(new Date(tempDate).setHours(16, 30))
+				}
 			}
-		}
-	};
+		};
+	}
+	$: newWorkDay = getNewWorkDay(tablePropId);
 
-	let _selectedWorker: ShiftWorker | null = null;
-	export let tablePropId: string;
 	$: workers = $workerStore!;
+	let selectedWorkerId = $stateStore.workerId;
 
-	$: selectedWorker = _selectedWorker;
+	stateStore.subscribe((state) => {
+		selectedWorkerId = state.workerId;
+		workers = $workerStore!;
+	});
+	$: selectedWorker = $workerStore.find(
+		(worker) => worker.id === selectedWorkerId
+	);
 	$: shiftErrorText = '';
 
 	workerStore.subscribe((value) => (workers = value));
@@ -60,9 +68,15 @@
 		)!;
 
 		if (type === 'early') {
-			newWorkDay.day.shift = tableProps.shiftTimes.early;
+			newWorkDay.day.shift = {
+				startTime: new Date(tableProps.shiftTimes.early.startTime),
+				endTime: new Date(tableProps.shiftTimes.early.endTime)
+			};
 		} else if (type === 'late') {
-			newWorkDay.day.shift = tableProps.shiftTimes.late;
+			newWorkDay.day.shift = {
+				startTime: new Date(tableProps.shiftTimes.late.startTime),
+				endTime: new Date(tableProps.shiftTimes.late.endTime)
+			};
 		}
 
 		newWorkDay = newWorkDay;
@@ -116,30 +130,20 @@
 			setShiftErrorText('FIX FIX FIX der sollte den nächsten Tag nehmen');
 	}
 
-	function compareShift(a: Shift, b: Shift): boolean {
-		if (a.endTime !== b.endTime) return false;
-		if (a.startTime !== b.endTime) return false;
-
-		return true;
-	}
-
-	function compareShiftTimes(a: ShiftTimes, b: ShiftTimes): boolean {
-		if (!compareShift(a.early, b.early)) return false;
-		if (!compareShift(a.late, b.late)) return false;
-		return true;
-	}
-
 	function handleSubmitCreateShift() {
 		setShiftErrorText('');
 
 		const tempWorkDay: WorkDay = {
 			...newWorkDay,
+			tablePropId,
 			id: uuidv4()
 		};
 
 		if (
 			selectedWorker?.workDays.find(
-				(_workDay) => _workDay.day.index === tempWorkDay.day.index
+				(_workDay) =>
+					_workDay.day.index === tempWorkDay.day.index &&
+					_workDay.tablePropId === tablePropId
 			)
 		) {
 			setShiftErrorText('Mitarbeiter hat an diesem Tag schon eine schicht');
@@ -149,6 +153,7 @@
 		selectedWorker?.workDays.push(tempWorkDay);
 
 		newWorkDay = {
+			tablePropId,
 			id: 'NOID',
 			hours: 8,
 			day: {
@@ -162,8 +167,13 @@
 
 		setShiftFromWorkday(tablePropId, selectedWorker!, tempWorkDay);
 		updateWorker(selectedWorker!);
-		selectedWorker = selectedWorker;
+		resetState('true');
 	}
+
+	function resetState(trigger: string) {
+		$stateStore = $stateStore;
+	}
+
 	function setShiftErrorText(text: string) {
 		shiftErrorText = text;
 
@@ -171,13 +181,17 @@
 			shiftErrorText = '';
 		}, 5000);
 	}
+
 	function getWorkerStats(worker: ShiftWorker): string {
 		let shifts = 0;
 		let hours = 0;
-		worker.workDays.forEach((workDay) => {
-			hours += workDay.hours;
-			shifts++;
-		});
+		worker.workDays
+			.filter((workDay) => workDay.tablePropId === tablePropId)
+			.forEach((workDay) => {
+				hours += workDay.hours;
+				shifts++;
+			});
+
 		return `${shifts}. Sch...  :  ${hours}h`;
 	}
 
@@ -192,20 +206,20 @@
 			'input[name="editMaxHours"]'
 		) as HTMLInputElement;
 		const priorityInput = document.querySelector(
-			'input[name="editPriority"]'
+			'input[name="editBoss"]'
 		) as HTMLInputElement;
-
+		console.log(priorityInput.value);
 		const firstName = firstNameInput.value;
 		const lastName = lastNameInput.value;
 		const maxAvailableHours = parseInt(maxHoursInput.value, 10);
-		const staffPriority = parseInt(priorityInput.value, 10);
+		const isBoss = priorityInput.value === 'true';
 
 		// Update the selectedWorker with the new data
 		selectedWorker = {
 			...selectedWorker!,
 			firstName,
 			lastName,
-			jobInfo: { maxAvailableHours, staffPriority }
+			jobInfo: { maxAvailableHours, isBoss }
 		};
 
 		updateWorker(selectedWorker);
@@ -213,6 +227,7 @@
 	}
 
 	function handleSubmitCreateWorker() {
+		console.log(newWorker);
 		const tempWorker: ShiftWorker = {
 			colorHex: newWorker.colorHex,
 			createdAt: new Date(),
@@ -221,7 +236,7 @@
 			lastName: newWorker.lastName,
 			jobInfo: {
 				maxAvailableHours: newWorker.jobInfo.maxAvailableHours,
-				staffPriority: newWorker.jobInfo.staffPriority
+				isBoss: newWorker.jobInfo.isBoss
 			},
 			workDays: []
 		};
@@ -238,7 +253,7 @@
 			lastName: '',
 			jobInfo: {
 				maxAvailableHours: 0,
-				staffPriority: 0
+				isBoss: false
 			},
 			workDays: []
 		};
@@ -270,8 +285,7 @@
 							class="WorkersListItem"
 							class:hightlightRow={worker === selectedWorker}
 							on:click={(e) => {
-								if (selectedWorker !== worker) selectedWorker = worker;
-								else selectedWorker = null;
+								$stateStore.workerId = worker.id;
 							}}
 						>
 							<div>
@@ -279,6 +293,9 @@
 								{worker.lastName}
 							</div>
 							<div>{getWorkerStats(worker)}</div>
+							{#if worker.jobInfo.isBoss}
+								Boss
+							{/if}
 							<button on:click={() => deleteWorker(worker)}>X</button>
 						</div>
 					{/each}
@@ -324,6 +341,7 @@
 					<input
 						style="float:right;"
 						type="number"
+						disabled={newWorker.jobInfo.isBoss}
 						bind:value={newWorker.jobInfo.maxAvailableHours}
 					/>
 				</label>
@@ -331,8 +349,8 @@
 					Mitarbeiter Prio:
 					<input
 						style="float:right;"
-						type="number"
-						bind:value={newWorker.jobInfo.staffPriority}
+						type="checkbox"
+						bind:checked={newWorker.jobInfo.isBoss}
 					/>
 				</label>
 				<button type="submit">Erstelle Arbeiter</button>
@@ -387,10 +405,10 @@
 					<label class="CreateWorkerLabel">
 						Mitarbeiter Prio:
 						<input
-							name="editPriority"
+							name="editBoss"
 							style="float:right;"
-							type="number"
-							value={selectedWorker.jobInfo.staffPriority}
+							type="checkbox"
+							value={selectedWorker.jobInfo.isBoss}
 						/>
 					</label>
 					<button type="submit">Aktuallisiere Arbeiter</button>
@@ -481,8 +499,9 @@
 	{/if}
 </div>
 <WorkDayList
+	{selectedWorkerId}
+	{tablePropId}
 	on:shiftsUpdated={() => (workers = $workerStore)}
-	_selectedWorker={selectedWorker}
 />
 
 <style>

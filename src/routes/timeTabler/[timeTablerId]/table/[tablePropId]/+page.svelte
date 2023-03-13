@@ -11,8 +11,16 @@
 	import { page } from '$app/stores';
 	import dayjs from 'dayjs';
 	import type { TableCreateConfig } from '../../../../../stores/tablePropsStore';
+	import { stateStore } from '../../../../../stores/stateStore';
+
 	let timeTablerId: string = $page.params.timeTablerId;
+
 	$: tablePropId = $page.params.tablePropId;
+	$: setTimeTablerId(timeTablerId);
+
+	function setTimeTablerId(timeTablerId: string) {
+		$stateStore.timeTablerId = timeTablerId;
+	}
 
 	function getNewTableProp(_tablePropId: string) {
 		return $tablePropsStore.find((prop) => prop.id === tablePropId)!;
@@ -94,11 +102,11 @@
 	<div class="itemContainer2">
 		{#if beforeTablePropId !== ''}
 			<a href={`${beforeTablePropId}`}
-				><span>Nächster <br />Schichtplan</span>
+				><span>Letzer <br />Schichtplan</span>
 			</a>
 		{:else}
 			<a href={`${tablePropId}`}>
-				<span>Nächster <br />Schichtplan</span>
+				<span>Letzer <br />Schichtplan</span>
 			</a>
 		{/if}
 		<ShiftTable {tablePropId} />
@@ -116,7 +124,6 @@
 	</div>
 	<!-- else content here -->
 {/if}
-{#if !showCreate || tableProp}{/if}
 
 <style>
 	a {
@@ -137,24 +144,7 @@
 		text-decoration: none;
 	}
 
-	button {
-		border: none;
-		border-radius: 4px;
-		background-color: rgba(135, 206, 235, 0.1);
-		color: #333;
-		padding: 6px 12px;
-		font-size: 14px;
-		font-weight: bold;
-		letter-spacing: 1px;
-		box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
-		transition: all 0.2s ease;
-		cursor: pointer;
-	}
 	a:hover {
-		background-color: rgba(135, 206, 235, 0.3);
-		color: black;
-	}
-	button:hover {
 		background-color: rgba(135, 206, 235, 0.3);
 		color: black;
 	}
@@ -180,7 +170,7 @@
 		text-align: center;
 		gap: 1em;
 		justify-content: center;
-		background-color: lightsalmon;
+		background-color: ghostwhite;
 		flex-wrap: wrap;
 		padding-bottom: 1em;
 	}

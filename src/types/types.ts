@@ -13,3 +13,13 @@ export type ConfigurableMonth = {
 	monthString: string;
 	year: number;
 };
+
+export type WorkerStat = {
+	id: string;
+	max: number;
+	hours: number;
+	boss: boolean;
+	firstName: string;
+	lastName: string;
+	oversteps: number;
+};

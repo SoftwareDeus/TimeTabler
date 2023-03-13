@@ -1,20 +1,46 @@
 <script lang="ts">
-	import { updateWorker, updateWorkerShift } from '../stores/shiftWorkerStore';
+	import {
+		updateWorker,
+		updateWorkerShift,
+		workerStore
+	} from '../stores/shiftWorkerStore';
 	import type { WorkDay, ShiftWorker } from '../stores/shiftWorkerStore';
 	import dayjs from 'dayjs';
 	import { MonthsEnum } from '../types/enums';
 	import { createEventDispatcher } from 'svelte';
+	import { stateStore } from '../stores/stateStore';
 
+	export let tablePropId: string;
 	const dispatch = createEventDispatcher();
-	export let _selectedWorker: ShiftWorker | null = null;
 	let _selectedShift: WorkDay;
 
-	$: selectedWorker = _selectedWorker;
+	export let selectedWorkerId: string;
+	$: shifts = getWorkerShifts(selectedWorkerId, tablePropId);
+	stateStore.subscribe(
+		(value) => (shifts = getWorkerShifts(value.workerId, tablePropId))
+	);
+
+	$: selectedWorker = getSelectedWorker(selectedWorkerId);
+	function getSelectedWorker(workerId: string): ShiftWorker {
+		return $workerStore.find((worker) => worker.id === workerId)!;
+	}
 	$: selectedShift = _selectedShift;
 	$: newEndTime = dayjs(selectedShift?.day.shift.endTime).format('HH:mm');
 	$: newStartTime = dayjs(selectedShift?.day.shift.startTime).format('HH:mm');
 	$: newShift = { ...selectedShift };
+	function getWorkerShifts(
+		_selectedWorkerId: string,
+		_tablePropId: string
+	): WorkDay[] {
+		if (!selectedWorkerId) return [];
+		const worker = $workerStore.find(
+			(worker) => worker.id === _selectedWorkerId
+		)!;
 
+		return worker.workDays.filter(
+			(workDay) => workDay.tablePropId === _tablePropId
+		);
+	}
 	function deleteShift(day: WorkDay) {
 		if (selectedWorker) {
 			selectedWorker.workDays = selectedWorker.workDays.filter(
@@ -74,29 +100,34 @@
 <div class="DayListContainer">
 	{#if selectedWorker}
 		<h2>Schichten</h2>
-		<div class="WorkerDayList" style="flex: 1;">
-			{#each selectedWorker.workDays as workDay}
-				<!-- svelte-ignore a11y-click-events-have-key-events -->
-				<div class:highlight={selectedShift === workDay} class="ShiftListItem">
+		<div class="WorkerDayList" style="overflow: auto; height: 150px;">
+			{#if shifts}
+				{#each shifts as workDay}
+					<!-- svelte-ignore a11y-click-events-have-key-events -->
 					<div
-						on:click={() => {
-							selectedShift = workDay;
-						}}
-						class="ShiftListItemInfo"
+						class:highlight={selectedShift === workDay}
+						class="ShiftListItem"
 					>
-						<div class="ShiftListItemTime">
-							{workDay.hours} Std - {workDay.day.index}.{MonthsEnum[
-								new Date(workDay.day.shift.startTime).getMonth()
-							]}
-							<br />
-							{dayjs(workDay.day.shift.startTime).format('HH:mm')} - {dayjs(
-								workDay.day.shift.endTime
-							).format('HH:mm')}
+						<div
+							on:click={() => {
+								selectedShift = workDay;
+							}}
+							class="ShiftListItemInfo"
+						>
+							<div class="ShiftListItemTime">
+								{workDay.hours} Std - {workDay.day.index}.{MonthsEnum[
+									new Date(workDay.day.shift.startTime).getMonth()
+								]}
+								<br />
+								{dayjs(workDay.day.shift.startTime).format('HH:mm')} - {dayjs(
+									workDay.day.shift.endTime
+								).format('HH:mm')}
+							</div>
 						</div>
+						<button on:click={() => deleteShift(workDay)}>X</button>
 					</div>
-					<button on:click={() => deleteShift(workDay)}>X</button>
-				</div>
-			{/each}
+				{/each}
+			{/if}
 		</div>
 		<div class="WorkerDayEdit">
 			<form
@@ -108,7 +139,7 @@
 						Start:
 						<input
 							style="float:right;"
-							bind:value={newStartTime}
+							value={newStartTime}
 							type="time"
 							on:change={handleStartTimeChange}
 						/>
@@ -118,7 +149,7 @@
 						Ende:
 						<input
 							style="float:right;"
-							bind:value={newEndTime}
+							value={newEndTime}
 							type="time"
 							on:change={handleEndTimeChange}
 						/>

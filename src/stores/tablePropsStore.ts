@@ -1,6 +1,9 @@
 import dayjs from 'dayjs';
 import type { Shift, ShiftTimes } from './shiftConfigStore';
-import type { ShiftWorker, WorkDay } from './shiftWorkerStore';
+import {
+	workerStore,
+} from './shiftWorkerStore';
+import type { ShiftWorker, WorkDay} from './shiftWorkerStore';
 import { createIndexedDBStore } from './stores';
 import { v4 as uuidv4 } from 'uuid';
 import { get } from 'svelte/store';
@@ -33,7 +36,7 @@ export type TimeTabler = {
 	name: string;
 	createdAt: Date;
 	TablePropIds: string[];
-}
+};
 
 export type TableProp = {
 	index: number;
@@ -47,45 +50,96 @@ export type TableProp = {
 
 export type Holiday = {
 	name: string;
-	date: Date,
-}
+	date: Date;
+};
 
 export const timeTablerStore = createIndexedDBStore<TimeTabler[]>({
-	key: "timeTabler",
+	key: 'timeTabler',
 	initialValue: []
-})
-
+});
 
 export const tablePropsStore = createIndexedDBStore<TableProp[]>({
 	key: 'tableProps',
 	initialValue: []
 });
 
-export function createTimeTabler(name: string): string{
-	const timeTabler : TimeTabler = {
-			id: uuidv4(),
-			TablePropIds: [],
-			name: name,
-			createdAt: new Date(),
-	}
+export function createTimeTabler(name: string): string {
+	const timeTabler: TimeTabler = {
+		id: uuidv4(),
+		TablePropIds: [],
+		name: name,
+		createdAt: new Date()
+	};
 
-	timeTablerStore.update(timeTablers => [...timeTablers, timeTabler]);
+	timeTablerStore.update((timeTablers) => [...timeTablers, timeTabler]);
 
 	return timeTabler.id;
 }
+function compareShift(a: Shift, b: Shift): boolean {
+	if (dayjs(a.startTime).format('HH:mm') !== dayjs(b.startTime).format('HH:mm'))
+		return false;
+	if (dayjs(a.endTime).format('HH:mm') !== dayjs(b.endTime).format('HH:mm'))
+		return false;
 
+	return true;
+}
+
+//kann man vielleicht mal gebrauchen wenns funktioniert, aber gerade eig nicht der plan
+// export function reassignShift(
+// 	workday: WorkDay,
+// 	oldWorkerId: string,
+// 	newWorkerId: string,
+// 	tablePropId: string
+// ) {
+// 	const tableProp = get(tablePropsStore).find(
+// 		(tableProp) => tableProp.id === tablePropId
+// 	)!;
+// 	const day = workday.day.index - 1;
+// 	if (compareShift(tableProp.days[day].shiftTimes.early, workday.day.shift)) {
+// 		tableProp.days[day].early = get(workerStore).find(
+// 			(worker) => worker.id === newWorkerId
+// 		)!;
+// 	}
+// 	if (compareShift(tableProp.days[day].shiftTimes.late, workday.day.shift)) {
+// 		tableProp.days[day].late = get(workerStore).find(
+// 			(worker) => worker.id === newWorkerId
+// 		)!;
+// 	}
+// 	workerStore.update((workers) => {
+// 		const newWorker = workers.find((worker) => newWorkerId)!;
+// 		newWorker.workDays.push(workday);
+
+// 		const oldWorker = workers.find((worker) => oldWorkerId)!;
+// 		oldWorker.workDays.filter((_workday) => _workday.id !== workday.id);
+// 		return [
+// 			...workers.filter(
+// 				(_worker) => _worker.id !== newWorkerId && _worker.id !== oldWorkerId
+// 			),
+// 			newWorker,
+// 			oldWorker
+// 		];
+// 	});
+// 	setTableProps(tableProp);
+// }
 export function createTableProp(timeTablerId: string): string {
-	const timeTabler = get(timeTablerStore).find(timeTabler => timeTabler.id === timeTablerId)
-	
-	if (!timeTabler)
-		return ""; 
+	const timeTabler = get(timeTablerStore).find(
+		(timeTabler) => timeTabler.id === timeTablerId
+	);
 
-	const tableProp = get(tablePropsStore).filter(prop => timeTabler.TablePropIds.find(propId => propId === prop.id)).sort((a, b) => a.index - b.index).pop();
-	
-	const tablePropId = initNewTableProp(timeTabler.TablePropIds.length + 1, tableProp);
-	
-	if(!timeTabler)
-		return "";
+	if (!timeTabler) return '';
+
+	const tableProp = get(tablePropsStore)
+		.filter((prop) =>
+			timeTabler.TablePropIds.find((propId) => propId === prop.id)
+		)
+		.sort((a, b) => a.index - b.index)
+		.pop();
+
+	const tablePropId = initNewTableProp(
+		timeTabler.TablePropIds.length + 1,
+		tableProp
+	);
+	if (!timeTabler) return '';
 
 	timeTabler?.TablePropIds.push(tablePropId);
 	updateTimeTabler(timeTabler);
@@ -94,28 +148,32 @@ export function createTableProp(timeTablerId: string): string {
 }
 
 export function updateTimeTabler(timeTabler: TimeTabler) {
-	timeTablerStore.update(timeTablers => {
-		return [...timeTablers.filter(_timeTabler => _timeTabler.id !== timeTabler.id), timeTabler];		
-	})
+	timeTablerStore.update((timeTablers) => {
+		return [
+			...timeTablers.filter((_timeTabler) => _timeTabler.id !== timeTabler.id),
+			timeTabler
+		];
+	});
 }
 
-function initNewTableProp(index: number, tableProps: TableProp | undefined): string {
-	if(tableProps)
-	{
+function initNewTableProp(
+	index: number,
+	tableProps: TableProp | undefined
+): string {
+	if (tableProps) {
 		const tableProp: TableProp = {
 			index,
 			id: uuidv4(),
 			date: new Date(tableProps.date),
 			days: [],
 			dirty: true,
-			shiftTimes: tableProps.shiftTimes,
+			shiftTimes: { ...tableProps.shiftTimes },
 			holidays: []
 		};
-		tableProp.date.setMonth(new Date(tableProp.date).getMonth() + 1)
-		tablePropsStore.update(tableProps => [...tableProps, {...tableProp}])
+		tableProp.date.setMonth(new Date(tableProp.date).getMonth() + 1);
+		tablePropsStore.update((tableProps) => [...tableProps, { ...tableProp }]);
 		return tableProp.id;
-	}
-	else {
+	} else {
 		const tableProp: TableProp = {
 			index,
 			id: uuidv4(),
@@ -128,58 +186,66 @@ function initNewTableProp(index: number, tableProps: TableProp | undefined): str
 			},
 			holidays: []
 		};
-		
-		tablePropsStore.update(tableProps => [...tableProps, {...tableProp}])
+		tablePropsStore.update((tableProps) => [...tableProps, { ...tableProp }]);
 		return tableProp.id;
 	}
-
 }
 
-export function setShiftFromWorkday(tablePropId: string, worker: ShiftWorker, workday: WorkDay){
-		const tableProp = get(tablePropsStore).find(_prop => _prop.id === tablePropId)!
+export function setShiftFromWorkday(
+	tablePropId: string,
+	worker: ShiftWorker,
+	workday: WorkDay
+) {
+	const tableProp = get(tablePropsStore).find(
+		(_prop) => _prop.id === tablePropId
+	)!;
 
-		const day = tableProp.days.find(day => day.day === workday.day.index);
+	const day = tableProp.days.find((day) => day.day === workday.day.index);
+	console.log(day, 'start');
+	if (!day) return;
+	if (
+		dayjs(day?.shiftTimes.early.startTime).format('HH:mm') ===
+		dayjs(workday.day.shift.startTime).format('HH:mm')
+	) {
+		day.early = worker;
+	}
 
-		if(!day)
-			return;
+	if (
+		dayjs(day?.shiftTimes.late.startTime).format('HH:mm') ===
+		dayjs(workday.day.shift.startTime).format('HH:mm')
+	) {
+		day.late = worker;
+	}
 
-		if(dayjs(day?.shiftTimes.early.startTime).format("HH:mm") === dayjs(workday.day.shift.startTime).format("HH:mm"))
-		{
-			day.early = worker;
-		}
-
-		if(dayjs(day?.shiftTimes.late.startTime).format("HH:mm") === dayjs(workday.day.shift.startTime).format("HH:mm"))
-		{
-			day.late = worker;
-		}
-
-		setTableProps(tableProp);
+	setTableProps(tableProp);
 }
 
-export function setTablePropsDate(tableProps: TableProp, date: Date){
-	tableProps.date = date;
+export function setTablePropsDate(tableProps: TableProp, date: Date) {
+	tableProps.date = new Date(date);
 	const newDate = new Date(tableProps.date);
 	newDate.setDate(1);
 
-	
 	tableProps.shiftTimes.early.startTime = new Date(newDate);
 	tableProps.shiftTimes.early.endTime = new Date(newDate);
 	tableProps.shiftTimes.late.endTime = new Date(newDate);
 	tableProps.shiftTimes.late.startTime = new Date(newDate);
-	tableProps.shiftTimes.early.endTime.setDate(1)
-	tableProps.shiftTimes.late.endTime.setDate(1)
-	tableProps.shiftTimes.early.startTime.setDate(1)
-	tableProps.shiftTimes.late.startTime.setDate(1)
-	
+	tableProps.shiftTimes.early.endTime.setDate(1);
+	tableProps.shiftTimes.late.endTime.setDate(1);
+	tableProps.shiftTimes.early.startTime.setDate(1);
+	tableProps.shiftTimes.late.startTime.setDate(1);
+
 	setTableProps(tableProps);
 }
 
 export function setTableProps(tableProp: TableProp) {
-	tablePropsStore?.update(tableProps => {
-		const prop = tableProps.find(_prop => _prop.id === tableProp.id);
-		if(prop)
-			return [...tableProps.filter(_prop => !(_prop.id === tableProp.id)), tableProp]
-			
+	tablePropsStore?.update((tableProps) => {
+		const prop = tableProps.find((_prop) => _prop.id === tableProp.id);
+		if (prop)
+			return [
+				...tableProps.filter((_prop) => !(_prop.id === tableProp.id)),
+				tableProp
+			];
+
 		return tableProps;
 	});
 }
@@ -195,9 +261,11 @@ export function updateShiftTimesFromTimes(
 	tablePropId: string
 ) {
 	tablePropsStore.update((tableProps) => {
-		const tableProp : TableProp | undefined = tableProps.find(_prop => _prop.id === tablePropId)
-		
-		if(!tableProp){
+		const tableProp: TableProp | undefined = tableProps.find(
+			(_prop) => _prop.id === tablePropId
+		);
+
+		if (!tableProp) {
 			return tableProps;
 		}
 		const earlyStartDate = new Date(tableProp.date);
@@ -214,6 +282,7 @@ export function updateShiftTimesFromTimes(
 			const [hours, minutes] = earlyStart
 				.split(':')
 				.map((timeStringSplit) => parseInt(timeStringSplit));
+			console.log(hours, minutes, earlyStart);
 			earlyStartDate.setHours(hours, minutes);
 		}
 		if (isTimeString(earlyEnd)) {
@@ -249,7 +318,10 @@ export function updateShiftTimesFromTimes(
 				endTime: lateEndDate
 			}
 		};
-		return [...tableProps.filter(_prop => !(_prop.id === tableProp.id)), tableProp]
+		return [
+			...tableProps.filter((_prop) => !(_prop.id === tableProp.id)),
+			tableProp
+		];
 	});
 }
 export function getEarlyDate(tableProps: TableProp, day: number): Shift {
@@ -268,8 +340,7 @@ export function getTablePropsFromTimeTabler(timeTablerId: string): TableProp[] {
 	return _tableProps
 		.filter((prop) => timeTablerPropIds?.find((_id) => _id === prop.id))
 		.sort((propA, propB) => propA.index - propB.index);
-		
-	}
+}
 
 export function getLateDate(tableProps: TableProp, day: number): Shift {
 	const startTime = new Date(tableProps.shiftTimes.late.startTime);
@@ -281,22 +352,27 @@ export function getLateDate(tableProps: TableProp, day: number): Shift {
 	return { startTime, endTime };
 }
 
-export function getTablePropById(tablePropId: string): TableProp{
+export function getTablePropById(tablePropId: string): TableProp {
 	let _tableProp = {} as TableProp;
-	tablePropsStore.subscribe(tableProps => {
-		const tableProp = tableProps.find(tableProp => tableProp.id === tablePropId)
+	tablePropsStore.subscribe((tableProps) => {
+		const tableProp = tableProps.find(
+			(tableProp) => tableProp.id === tablePropId
+		);
 
-		if(!tableProp)
-			console.error("Keine Tabledaten gefunden ID: " + tablePropId)
+		if (!tableProp)
+			console.error('Keine Tabledaten gefunden ID: ' + tablePropId);
 		_tableProp = tableProp!;
-	})
+	});
 
-	return _tableProp!	
+	return _tableProp!;
 }
-export function initTablePropData(tableProp: TableProp, tableCreateConfig: TableCreateConfig): TableProp {
-	tableProp.date = tableCreateConfig.monthDate;
+export function initTablePropData(
+	tableProp: TableProp,
+	tableCreateConfig: TableCreateConfig
+): TableProp {
+	tableProp.date = new Date(tableCreateConfig.monthDate);
 	tableProp.dirty = false;
-	setTablePropsDate(tableProp, tableCreateConfig.monthDate);
+	setTablePropsDate(tableProp, new Date(tableCreateConfig.monthDate));
 	updateShiftTimesFromTimes(
 		tableCreateConfig.earlyStart,
 		tableCreateConfig.earlyEnd,
@@ -305,14 +381,17 @@ export function initTablePropData(tableProp: TableProp, tableCreateConfig: Table
 		tableProp.id
 	);
 	updateShiftDays(tableProp.id);
-	return get(tablePropsStore).find((prop) => prop.id === tableProp.id) ?? tableProp;
+	return (
+		get(tablePropsStore).find((prop) => prop.id === tableProp.id) ?? tableProp
+	);
 }
 export function updateShiftDays(tablePropId: string) {
 	tablePropsStore.update((tableProps) => {
-		const tableProp : TableProp | undefined = tableProps.find(_prop => _prop.id === tablePropId)
-		if(!tableProp)
-				return tableProps;
-				
+		const tableProp: TableProp | undefined = tableProps.find(
+			(_prop) => _prop.id === tablePropId
+		);
+		if (!tableProp) return tableProps;
+
 		const earlyStart = `${tableProp.shiftTimes.early.startTime.getHours()}:${tableProp.shiftTimes.early.startTime.getMinutes()}`;
 		const earlyEnd = `${tableProp.shiftTimes.early.endTime.getHours()}:${tableProp.shiftTimes.early.endTime.getMinutes()}`;
 		const lateStart = `${tableProp.shiftTimes.late.startTime.getHours()}:${tableProp.shiftTimes.late.startTime.getMinutes()}`;
@@ -348,7 +427,7 @@ function getDays(
 				early: null,
 				late: null,
 				shiftTimes: {
-					early: getEarlyDate(tableProps,  item),
+					early: getEarlyDate(tableProps, item),
 					late: getLateDate(tableProps, item)
 				}
 			};

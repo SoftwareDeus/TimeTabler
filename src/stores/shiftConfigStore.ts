@@ -10,9 +10,9 @@ export interface ShiftSettings {
 }
 
 export type Shift = {
-	startTime: Date,
-	endTime: Date
-}
+	startTime: Date;
+	endTime: Date;
+};
 export interface ShiftTimes {
 	early: Shift;
 	late: Shift;
